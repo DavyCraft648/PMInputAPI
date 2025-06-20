@@ -56,7 +56,7 @@ library that other plugins *include* in their code.
      YourPlugin:
        libs:
          - src: DavyCraft648/PMInputAPI/PMInputAPI
-           version: ^1.0.0
+           version: ^1.0.1
    ```
 
 ### Registering the Virion
