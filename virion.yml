@@ -1,0 +1,6 @@
+name: PMInputAPI
+version: 1.0.0
+antigen: DavyCraft648\PMInputAPI
+api: 5.0.0
+authors: [DavyCraft648]
+description: PocketMine-MP virion designed to detect player input and various input modes
