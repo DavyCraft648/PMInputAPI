@@ -1,0 +1,10 @@
+--- # Poggit-CI Manifest. Open the CI at https://poggit.pmmp.io/ci/DavyCraft648/PMInputAPI
+build-by-default: true
+branches:
+- master
+projects:
+  PMInputAPI:
+    path: ""
+    model: virion
+    type: library
+...
