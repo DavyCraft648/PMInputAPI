@@ -70,13 +70,15 @@ declare(strict_types=1);
 
 namespace your\plugin\namespace;
 
-use DavyCraft648\PMInputAPI\PMInputAPI;
-use DavyCraft648\PMInputAPI\InputPermissionCategory;
+use DavyCraft648\PMInputAPI\ButtonState;
 use DavyCraft648\PMInputAPI\InputButton;
+use DavyCraft648\PMInputAPI\InputPermissionCategory;
+use DavyCraft648\PMInputAPI\PMInputAPI;
+use pocketmine\event\EventPriority;
 use pocketmine\event\player\PlayerJoinEvent;
-use pocketmine\math\Vector2;
 use pocketmine\player\Player;
 use pocketmine\plugin\PluginBase;
+use pocketmine\scheduler\ClosureTask;
 
 class MyPlugin extends PluginBase{
 
@@ -84,43 +86,52 @@ class MyPlugin extends PluginBase{
         // Register the PMInputAPI virion
         PMInputAPI::register($this);
 
-        // Example: Disable player movement after a player logs in
-        PMInputAPI::getInstance()->getServer()->getPluginManager()->registerEvent(PlayerJoinEvent::class, function(PlayerJoinEvent $event): void{
+        // Example: Disable player movement after a player joins
+        $this->getServer()->getPluginManager()->registerEvent(PlayerJoinEvent::class, function(PlayerJoinEvent $event): void{
             $player = $event->getPlayer();
             $playerSession = PMInputAPI::getInputManager()->getPlayer($player);
             $playerSession->inputPermissions->setPermissionCategory(InputPermissionCategory::Movement, false);
             $this->getLogger()->info("Movement disabled for " . $player->getName());
         }, EventPriority::MONITOR, $this);
 
-        // Example: Listen for input mode changes
+        // Example: Listeners
         PMInputAPI::getInputManager()->inputModeChangeListeners->add(function(Player $player, int $previousInputModeUsed, int $newInputModeUsed): void{
-            $this->getLogger()->info($player->getName() . " changed input mode from " . $previousInputModeUsed . " to " . $newInputModeUsed);
+            $player->sendMessage("Changed input mode from $previousInputModeUsed to $newInputModeUsed");
+        });
+
+        PMInputAPI::getInputManager()->permissionChangeListeners->add(function(Player $player, InputPermissionCategory $category, bool $enabled) : void{
+            $player->sendMessage("Changed input permission $category->name: " . ($enabled ? "enabled" : "disabled"));
+        });
+
+        PMInputAPI::getInputManager()->buttonInputListeners->add(function(Player $player, InputButton $button, ButtonState $newButtonState) : void{
+            $player->sendMessage("Button state of $button->name transferred to $newButtonState->name");
         });
 
         // Example: Check jump button state and movement vector
-        $this->getScheduler()->scheduleRepeatingTask(new class($this) extends Task {
-            private MyPlugin $plugin;
+        $this->getScheduler()->scheduleRepeatingTask(new ClosureTask(function(): void{
+            foreach ($this->getServer()->getOnlinePlayers() as $player) {
+                if(!$player->spawned){
+                    continue;
+                }
+                $session = PMInputAPI::getInputManager()->getPlayer($player);
+                $inputInfo = $session->inputInfo;
 
-            public function __construct(MyPlugin $plugin) {
-                $this->plugin = $plugin;
-            }
+                $message = "Jump: {$inputInfo->getButtonState(InputButton::Jump)->name}, Sneak: {$inputInfo->getButtonState(InputButton::Sneak)->name}\n";
 
-            public function onRun(): void {
-                foreach ($this->plugin->getServer()->getOnlinePlayers() as $player) {
-                    $session = PMInputAPI::getInputManager()->getPlayer($player);
-                    $inputInfo = $session->inputInfo;
-
-                    if ($inputInfo->getButtonState(InputButton::Jump) === \DavyCraft648\PMInputAPI\ButtonState::Pressed) {
-                        // $this->plugin->getLogger()->info($player->getName() . " is pressing jump!");
-                    }
-
-                    $movementVector = $inputInfo->getMovementVector();
-                    if (!$movementVector->equals(new Vector2(0, 0))) {
-                        // $this->plugin->getLogger()->info($player->getName() . " is moving: " . $movementVector->__toString());
+                $movementVector = $inputInfo->getMovementVector();
+                $message .= "$movementVector->x, $movementVector->y | ";
+                if($movementVector->x !== 0.0){
+                    $message .= $movementVector->x > 0 ? "Left" : "Right";
+                    if($movementVector->y !== 0.0){
+                        $message .= " & ";
                     }
                 }
+                if($movementVector->y !== 0.0){
+                    $message .= $movementVector->y > 0 ? "Forward" : "Backward";
+                }
+                $player->sendActionBarMessage($message);
             }
-        }, 20); // Run every second
+        }), 1); // Run every ticks
     }
 }
 ```
@@ -180,6 +191,6 @@ $movementVector = $inputInfo->getMovementVector();
 
 ## License
 
-This project is licensed under the MIT License - see the `LICENSE` file for details.
+This project is licensed under the MIT License - see the [`LICENSE`](LICENSE) file for details.
 
 ---

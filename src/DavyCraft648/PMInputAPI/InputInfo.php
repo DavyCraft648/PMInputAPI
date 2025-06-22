@@ -16,6 +16,10 @@ class InputInfo{
 	private int $pressedState = 0;
 	private Vector2 $movementVector;
 
+	public function __construct(){
+		$this->movementVector = new Vector2(0, 0);
+	}
+
 	/**
 	 * The last input mode used by the player.
 	 * @see InputMode
@@ -31,6 +35,9 @@ class InputInfo{
 		return $this->touchOnlyAffectsHotbar;
 	}
 
+	/**
+	 * Read raw player button inputs
+	 */
 	public function getButtonState(InputButton $button): ButtonState{
 		$bit = 1 << match ($button) {
 				InputButton::Jump => 1,
@@ -39,6 +46,9 @@ class InputInfo{
 		return ($this->pressedState & $bit) === $bit ? ButtonState::Pressed : ButtonState::Released;
 	}
 
+	/**
+	 * Read raw movement values
+	 */
 	public function getMovementVector(): Vector2{
 		return $this->movementVector;
 	}
@@ -51,8 +61,12 @@ class InputInfo{
 		$this->touchOnlyAffectsHotbar = $touchOnlyAffectsHotbar;
 	}
 
-	public function __setPressedState(int $pressedState): void{
-		$this->pressedState = $pressedState;
+	public function __setPressedState(InputButton $button, bool $state): void{
+		$bit = 1 << match ($button) {
+				InputButton::Jump => 1,
+				InputButton::Sneak => 2
+			};
+		$this->pressedState = $state ? $this->pressedState | $bit : $this->pressedState & ~$bit;
 	}
 
 	public function __setMovementVector(Vector2 $movementVector): void{

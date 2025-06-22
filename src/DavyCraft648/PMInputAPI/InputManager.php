@@ -21,12 +21,15 @@ final class InputManager{
 	public readonly ObjectSet $permissionChangeListeners;
 	/** @phpstan-var ObjectSet<\Closure(Player $player, int $previousInputModeUsed, int $newInputModeUsed) : void> */
 	public readonly ObjectSet $inputModeChangeListeners;
+	/** @phpstan-var ObjectSet<\Closure(Player $player, InputButton $button, ButtonState $newButtonState) : void> */
+	public readonly ObjectSet $buttonInputListeners;
 
 	private \WeakMap $players;
 
 	public function __construct(Plugin $plugin){
 		$this->permissionChangeListeners = new ObjectSet();
 		$this->inputModeChangeListeners = new ObjectSet();
+		$this->buttonInputListeners = new ObjectSet();
 		$this->players = new \WeakMap();
 		Server::getInstance()->getPluginManager()->registerEvent(PlayerLoginEvent::class, function(PlayerLoginEvent $event): void{
 			$player = $event->getPlayer();
@@ -44,8 +47,13 @@ final class InputManager{
 				}
 				$inputFlags = $packet->getInputFlags();
 				$session->inputInfo->__setTouchOnlyAffectsHotbar($inputFlags->get(PlayerAuthInputFlags::IS_HOTBAR_ONLY_TOUCH));
-				$pressedState = ($inputFlags->get(PlayerAuthInputFlags::JUMP_CURRENT_RAW) ? (1 << 1) : 0) | ($inputFlags->get(PlayerAuthInputFlags::SNEAK_CURRENT_RAW) ? (1 << 2) : 0);
-				$session->inputInfo->__setPressedState($pressedState);
+				foreach([PlayerAuthInputFlags::JUMP_CURRENT_RAW => InputButton::Jump, PlayerAuthInputFlags::SNEAK_CURRENT_RAW => InputButton::Sneak] as $flagIndex => $button){
+					$flag = $inputFlags->get($flagIndex);
+					if($flag !== ($session->inputInfo->getButtonState($button) === ButtonState::Pressed)){
+						$this->__onButtonInput($player, $button, $flag ? ButtonState::Pressed : ButtonState::Released);
+					}
+					$session->inputInfo->__setPressedState($button, $flag);
+				}
 				$session->inputInfo->__setMovementVector($packet->getRawMove());
 			}
 		}, EventPriority::MONITOR, $plugin);
@@ -86,9 +94,15 @@ final class InputManager{
 		}
 	}
 
-	public function __onInputModeChange(Player $player, int $previousInputModeUsed, int $newInputModeUsed): void{
+	private function __onInputModeChange(Player $player, int $previousInputModeUsed, int $newInputModeUsed): void{
 		foreach($this->inputModeChangeListeners as $inputModeChangeListener){
 			$inputModeChangeListener($player, $previousInputModeUsed, $newInputModeUsed);
+		}
+	}
+
+	private function __onButtonInput(Player $player, InputButton $button, ButtonState $newButtonState): void{
+		foreach($this->buttonInputListeners as $buttonInputListener){
+			$buttonInputListener($player, $button, $newButtonState);
 		}
 	}
 }

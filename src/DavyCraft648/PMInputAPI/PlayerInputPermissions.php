@@ -25,15 +25,35 @@ class PlayerInputPermissions{
 	 * Enable or disable an input permission. When enabled the input will work, when disabled will not work.
 	 */
 	public function setPermissionCategory(InputPermissionCategory $permissionCategory, bool $isEnabled): void{
-		$bit = 1 << $permissionCategory->value;
-		$this->lockComponentData = $isEnabled ? $this->lockComponentData & ~$bit : $this->lockComponentData | $bit;
+		$this->__sendData($isEnabled, $permissionCategory);
+	}
+
+	public function enable(InputPermissionCategory ...$permissionCategories): void{
+		$this->__sendData(true, ...$permissionCategories);
+	}
+
+	public function disable(InputPermissionCategory ...$permissionCategories): void{
+		$this->__sendData(false, ...$permissionCategories);
+	}
+
+	public function __sendData(bool $isEnabled, InputPermissionCategory ...$permissionCategories): void{
 		$player = Server::getInstance()->getPlayerByRawUUID($this->rawUUID);
 		if($player === null || !$player->isConnected()){
 			throw new \RuntimeException("Player offline");
 		}
-
-		$player->getNetworkSession()->sendDataPacket(UpdateClientInputLocksPacket::create($this->lockComponentData, $player->getPosition()->add(0, 1.62, 0)));
-		PMInputAPI::getInputManager()->__onPermissionChange($player, $permissionCategory, $isEnabled);
+		$changed = false;
+		foreach($permissionCategories as $permissionCategory){
+			$bit = 1 << $permissionCategory->value;
+			$oldData = $this->lockComponentData;
+			$this->lockComponentData = $isEnabled ? $this->lockComponentData & ~$bit : $this->lockComponentData | $bit;
+			if($oldData !== $this->lockComponentData){
+				$changed = true;
+				PMInputAPI::getInputManager()->__onPermissionChange($player, $permissionCategory, $isEnabled);
+			}
+		}
+		if($changed){
+			$player->getNetworkSession()->sendDataPacket(UpdateClientInputLocksPacket::create($this->lockComponentData, $player->getPosition()->add(0, 1.62, 0)));
+		}
 	}
 
 	public function __getLockComponentData(): int{
